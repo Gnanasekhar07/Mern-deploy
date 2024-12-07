@@ -132,10 +132,11 @@ const TransactionSearch = ({
           <Option value="">All</Option>
           <Option value="income">Income</Option>
           <Option value="expense">Expense</Option>
+          <Option value="property">property</Option>
         </Select>
       </div>
 
-      {/* <Select
+      <Select
         style={{ width: 200, marginRight: 10 }}
         onChange={(value) => setSelectedTag(value)}
         placeholder="Filter by tag"
@@ -144,7 +145,12 @@ const TransactionSearch = ({
         <Option value="food">Food</Option>
         <Option value="education">Education</Option>
         <Option value="office">Office</Option>
-      </Select> */}
+        <Option value="Health">Health</Option>
+        <Option value="Transport">Transport</Option>
+        <Option value="Shoping">Shoping</Option>
+        <Option value="bill payments">bill payments</Option>
+        <Option value="others">other</Option>
+      </Select> 
       <div className="my-table">
         <div
           style={{
@@ -177,9 +183,7 @@ const TransactionSearch = ({
             <button className="btn" onClick={exportToCsv}>
               Export to CSV
             </button>
-            <label for="file-csv" className="btn btn-blue">
-              Import from CSV
-            </label>
+            
             <input
               onChange={importFromCsv}
               id="file-csv"

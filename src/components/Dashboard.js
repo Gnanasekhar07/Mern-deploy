@@ -15,33 +15,10 @@ import Loader from "./Loader";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { unparse } from "papaparse";
+import axios from 'axios'; // Moved to the top
 
 const Dashboard = () => {
   const [user] = useAuthState(auth);
-
-  // const sampleTransactions = [
-  // {
-  //   name: "Pay day",
-  //   type: "income",
-  //   date: "2023-01-15",
-  //   amount: 2000,
-  //   tag: "salary",
-  // },
-  // {
-  //   name: "Dinner",
-  //   type: "expense",
-  //   date: "2023-01-20",
-  //   amount: 500,
-  //   tag: "food",
-  // },
-  // {
-  //   name: "Books",
-  //   type: "expense",
-  //   date: "2023-01-25",
-  //   amount: 300,
-  //   tag: "education",
-  // },
-  // ];
   const [isExpenseModalVisible, setIsExpenseModalVisible] = useState(false);
   const [isIncomeModalVisible, setIsIncomeModalVisible] = useState(false);
   const [transactions, setTransactions] = useState([]);
@@ -112,21 +89,21 @@ const Dashboard = () => {
     fetchTransactions();
   }, []);
 
-  const onFinish = (values, type) => {
-    const newTransaction = {
-      type: type,
-      date: moment(values.date).format("YYYY-MM-DD"),
-      amount: parseFloat(values.amount),
-      tag: values.tag,
-      name: values.name,
-    };
-
-    setTransactions([...transactions, newTransaction]);
-    setIsExpenseModalVisible(false);
-    setIsIncomeModalVisible(false);
-    addTransaction(newTransaction);
-    calculateBalance();
+const onFinish = (values, type) => {
+  const newTransaction = {
+    type: type,
+    date: moment(values.date).format("YYYY-MM-DD"),
+    amount: parseFloat(values.amount),
+    tag: values.tag,
+    name: values.name,
   };
+
+  setTransactions([...transactions, newTransaction]);
+  setIsExpenseModalVisible(false);
+  setIsIncomeModalVisible(false);
+  addTransaction(newTransaction, false); // Pass false to indicate a single transaction
+  calculateBalance();
+};
 
   const calculateBalance = () => {
     let incomeTotal = 0;
@@ -150,23 +127,28 @@ const Dashboard = () => {
     calculateBalance();
   }, [transactions]);
 
-  async function addTransaction(transaction, many) {
-    try {
-      const docRef = await addDoc(
-        collection(db, `users/${user.uid}/transactions`),
-        transaction
-      );
-      console.log("Document written with ID: ", docRef.id);
-      if (!many) {
-        toast.success("Transaction Added!");
-      }
-    } catch (e) {
-      console.error("Error adding document: ", e);
-      if (!many) {
-        toast.error("Couldn't add transaction");
-      }
+async function addTransaction(transaction, many) {
+  try {
+    // Add transaction to Firebase
+    const docRef = await addDoc(
+      collection(db, `users/${user.uid}/transactions`), // Fixed the path
+      transaction
+    );
+    console.log("Document written with ID: ", docRef.id);
+
+    // Add transaction to MongoDB
+    await axios.post('http://localhost:5000/api/transactions', transaction);
+
+    if (!many) {
+      toast.success("Transaction Added!");
+    }
+  } catch (e) {
+    console.error("Error adding document: ", e);
+    if (!many) {
+      toast.error("Couldn't add transaction");
     }
   }
+}
 
   async function fetchTransactions() {
     setLoading(true);
@@ -175,7 +157,6 @@ const Dashboard = () => {
       const querySnapshot = await getDocs(q);
       let transactionsArray = [];
       querySnapshot.forEach((doc) => {
-        // doc.data() is never undefined for query doc snapshots
         transactionsArray.push(doc.data());
       });
       setTransactions(transactionsArray);
@@ -199,6 +180,7 @@ const Dashboard = () => {
   function reset() {
     console.log("resetting");
   }
+  
   const cardStyle = {
     boxShadow: "0px 0px 30px 8px rgba(227, 227, 227, 0.75)",
     margin: "2rem",
@@ -260,7 +242,7 @@ const Dashboard = () => {
 
                 <Card bordered={true} style={{ ...cardStyle, flex: 0.45 }}>
                   <h2>Total Spending</h2>
-                  {spendingDataArray.length == 0 ? (
+                  {spendingDataArray.length === 0 ? (
                     <p>Seems like you haven't spent anything till now...</p>
                   ) : (
                     <Pie {...{ ...spendingConfig, data: spendingDataArray }} />

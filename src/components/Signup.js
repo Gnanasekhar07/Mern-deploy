@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { auth, provider, db } from "../firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import Header from "./Header";
 import { toast } from "react-toastify";
 
@@ -13,30 +19,54 @@ const SignUpSignIn = () => {
   const [flag, setFlag] = useState(false);
   const navigate = useNavigate();
 
+  const createUserDocument = async (user) => {
+    setLoading(true);
+    if (!user) return;
+
+    const userRef = doc(db, "users", user.uid);
+    const userData = await getDoc(userRef);
+
+    if (!userData.exists()) {
+      const { displayName, email, photoURL } = user;
+      const createdAt = new Date();
+
+      try {
+        await setDoc(userRef, {
+          name: displayName ? displayName : name,
+          email,
+          photoURL: photoURL ? photoURL : "",
+          createdAt,
+        });
+        toast.success("Account Created!");
+        setLoading(false);
+      } catch (error) {
+        toast.error(error.message);
+        console.error("Error creating user document: ", error);
+        setLoading(false);
+      }
+    }
+  };
+
   const signUpWithEmail = async (e) => {
     setLoading(true);
     e.preventDefault();
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/register", {
-        name,
+      const result = await createUserWithEmailAndPassword(
+        auth,
         email,
-        password,
-      });
-
-      if (response.status === 200) {
-        toast.success("Successfully Signed Up!");
-        navigate("/dashboard");
-      }
+        password
+      );
+      const user = result.user;
+      await createUserDocument(user);
+      toast.success("Successfully Signed Up!");
+      setLoading(false);
+      navigate("/dashboard");
     } catch (error) {
-      toast.error(error.response ? error.response.data.msg : "An error occurred");
-      console.error("Error signing up with email and password: ", error);
-    } finally {
+      toast.error(error.message);
+      console.error(
+        "Error signing up with email and password: ",
+        error.message
+      );
       setLoading(false);
     }
   };
@@ -45,25 +75,35 @@ const SignUpSignIn = () => {
     setLoading(true);
     e.preventDefault();
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/login", {
-        email,
-        password,
-      });
-
-      if (response.status === 200) {
-        toast.success("Logged In Successfully!");
-        navigate("/dashboard");
-      }
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+      navigate("/dashboard");
+      toast.success("Logged In Successfully!");
+      setLoading(false);
     } catch (error) {
-      toast.error(error.response ? error.response.data.msg : "An error occurred");
-      console.error("Error signing in with email and password: ", error);
-    } finally {
+      toast.error(error.message);
+      console.error(
+        "Error signing in with email and password: ",
+        error.message
+      );
       setLoading(false);
     }
   };
 
   const signInWithGoogle = async () => {
-    // Google sign-in logic can be added here if needed
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      await createUserDocument(user);
+      toast.success("User Authenticated Successfully!");
+      setLoading(false);
+      navigate("/dashboard");
+    } catch (error) {
+      setLoading(false);
+      toast.error(error.message);
+      console.error("Error signing in with Google: ", error.message);
+    }
   };
 
   return (
@@ -75,7 +115,7 @@ const SignUpSignIn = () => {
             <h2 style={{ textAlign: "center" }}>
               Log In on <span className="blue-text">Financely.</span>
             </h2>
-            <form onSubmit={signInWithEmail}>
+            <form onSubmit={signUpWithEmail}>
               <div className="input-wrapper">
                 <p>Email</p>
                 <input
@@ -101,7 +141,7 @@ const SignUpSignIn = () => {
                 className="btn"
                 onClick={signInWithEmail}
               >
-                {loading ? "Loading..." : "Log In with Email and Password"}
+                {loading ? "Loading..." : " Log In with Email and Password"}
               </button>
             </form>
             <p style={{ textAlign: "center", margin: 0 }}>or</p>
@@ -192,6 +232,9 @@ const SignUpSignIn = () => {
             >
               Or Have An Account Already? Click Here
             </p>
+            {/* <button onClick={signInWithEmail}>
+            Sign In with Email and Password
+          </button> */}
           </div>
         )}
       </div>
